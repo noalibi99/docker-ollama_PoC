@@ -1,0 +1,36 @@
+services:
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  model-init:
+    image: curlimages/curl
+    depends_on:
+      ollama:
+        condition: service_healthy
+    command: ["curl", "-sS", "-X", "POST", "http://ollama:11434/api/pull", "-d", "{\"name\":\"tinyllama\"}"]
+
+  app:
+    build: .
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
+    environment:
+      - OLLAMA_API_URL=http://ollama:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    tty: true
+    stdin_open: true
+    command: ["python", "cli.py"]
+
+volumes:
+  ollama_data:
